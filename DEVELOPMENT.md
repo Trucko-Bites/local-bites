@@ -64,8 +64,11 @@ local-bites/
 | POST | `/api/auth/logout/` | |
 | GET | `/api/auth/me/` | Current user, or 403 when logged out |
 | GET | `/api/health/` | Health check |
+| GET | `/api/places/search/?query=Riverside, CA` | City/address lookup for "search a different area". Returns `{"results": [{display_name, latitude, longitude}]}`; 429 if busy, 502 if the geocoder is down |
 
-Responses are GeoJSON. Each truck's `geometry.coordinates` is `[longitude, latitude]`. A truck is reported `is_open: false` once its `open_until` time passes, even if the owner never checked out.
+Place search uses the public OpenStreetMap Nominatim server, whose [usage policy](https://operations.osmfoundation.org/policies/nominatim/) allows at most 1 request per second for the whole app, requires an identifying User-Agent (`NOMINATIM_USER_AGENT`), and forbids search-as-you-type. The backend caches results for a week in the Postgres cache table (`createcachetable` runs at container start) and lets one request per second through across all gunicorn workers. If real traffic outgrows that, switch to a paid geocoder or a self-hosted Nominatim.
+
+Truck responses are GeoJSON. Each truck's `geometry.coordinates` is `[longitude, latitude]`. A truck is reported `is_open: false` once its `open_until` time passes, even if the owner never checked out.
 
 ## Owner check-in
 
