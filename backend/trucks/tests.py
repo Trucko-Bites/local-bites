@@ -1,11 +1,16 @@
+import json
 from datetime import timedelta
+from unittest.mock import MagicMock, patch
+from urllib.error import URLError
 
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point
+from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient, APITestCase
 
 from .models import FoodTruck
+from .place_search import RATE_GATE_CACHE_KEY
 
 # Reference point: downtown Redlands, CA (longitude, latitude)
 REDLANDS_LONGITUDE = -117.1825
@@ -218,3 +223,91 @@ class LoginTests(APITestCase):
 
     def test_me_is_forbidden_when_logged_out(self):
         self.assertEqual(self.browser_client.get("/api/auth/me/").status_code, 403)
+
+
+# What Nominatim's jsonv2 format sends back (lat/lon arrive as strings)
+SAMPLE_NOMINATIM_RESPONSE = [
+    {"display_name": "Riverside, Riverside County, California, United States", "lat": "33.9533", "lon": "-117.3962"},
+    {"display_name": "Riverside, Cook County, Illinois, United States", "lat": "41.8350", "lon": "-87.8228"},
+]
+
+
+def fake_nominatim_response(response_body):
+    """Stands in for urlopen's return value, which is used as a context manager."""
+    fake_response = MagicMock()
+    fake_response.read.return_value = json.dumps(response_body).encode("utf-8")
+    fake_response.__enter__.return_value = fake_response
+    return fake_response
+
+
+# Patch where place_search looks up urlopen, so no test ever calls the real server
+@patch("trucks.place_search.urlopen")
+class PlaceSearchTests(APITestCase):
+    def setUp(self):
+        # Each test starts with no cached results and an open rate gate
+        cache.clear()
+
+    def search(self, search_text):
+        return self.client.get("/api/places/search/", {"query": search_text})
+
+    def test_returns_places_with_numeric_coordinates(self, mock_urlopen):
+        mock_urlopen.return_value = fake_nominatim_response(SAMPLE_NOMINATIM_RESPONSE)
+        response = self.search("Riverside")
+        self.assertEqual(response.status_code, 200)
+        first_place = response.data["results"][0]
+        self.assertEqual(first_place["display_name"], SAMPLE_NOMINATIM_RESPONSE[0]["display_name"])
+        self.assertEqual(first_place["latitude"], 33.9533)
+        self.assertEqual(first_place["longitude"], -117.3962)
+
+    def test_sends_identifying_user_agent_and_country_filter(self, mock_urlopen):
+        mock_urlopen.return_value = fake_nominatim_response(SAMPLE_NOMINATIM_RESPONSE)
+        self.search("Riverside")
+        sent_request = mock_urlopen.call_args.args[0]
+        self.assertIn("LocalBites", sent_request.get_header("User-agent"))
+        self.assertIn("format=jsonv2", sent_request.full_url)
+        self.assertIn("countrycodes=us", sent_request.full_url)
+
+    def test_repeat_search_is_served_from_cache(self, mock_urlopen):
+        mock_urlopen.return_value = fake_nominatim_response(SAMPLE_NOMINATIM_RESPONSE)
+        self.search("Riverside, CA")
+        # Different spacing and capitalization still hits the same cache entry
+        response = self.search("  riverside,   ca ")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_urlopen.call_count, 1)
+
+    def test_too_short_query_is_rejected_without_calling_nominatim(self, mock_urlopen):
+        response = self.search("a")
+        self.assertEqual(response.status_code, 400)
+        mock_urlopen.assert_not_called()
+
+    def test_missing_query_is_rejected(self, mock_urlopen):
+        response = self.client.get("/api/places/search/")
+        self.assertEqual(response.status_code, 400)
+
+    def test_busy_rate_gate_returns_429(self, mock_urlopen):
+        # Simulate another request having used this second's Nominatim slot
+        cache.add(RATE_GATE_CACHE_KEY, True, timeout=60)
+        response = self.search("Fontana")
+        self.assertEqual(response.status_code, 429)
+        mock_urlopen.assert_not_called()
+
+    def test_network_failure_returns_502(self, mock_urlopen):
+        mock_urlopen.side_effect = URLError("connection refused")
+        response = self.search("Fontana")
+        self.assertEqual(response.status_code, 502)
+
+    def test_unexpected_response_shape_returns_502(self, mock_urlopen):
+        mock_urlopen.return_value = fake_nominatim_response([{"name": "no coordinates here"}])
+        response = self.search("Fontana")
+        self.assertEqual(response.status_code, 502)
+
+    def test_failed_search_is_not_cached(self, mock_urlopen):
+        mock_urlopen.side_effect = URLError("connection refused")
+        self.search("Fontana")
+        # Reopen the gate, fix the "network", and search again: Nominatim must be called
+        cache.delete(RATE_GATE_CACHE_KEY)
+        mock_urlopen.side_effect = None
+        mock_urlopen.return_value = fake_nominatim_response(SAMPLE_NOMINATIM_RESPONSE)
+        response = self.search("Fontana")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_urlopen.call_count, 2)

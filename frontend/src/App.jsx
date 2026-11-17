@@ -16,6 +16,7 @@ import { fetchNearbyFoodTrucks } from './api/foodTrucks.js'
 import FoodTruckList from './components/FoodTruckList.jsx'
 import FoodTruckMap from './components/FoodTruckMap.jsx'
 import OwnerPanel from './components/OwnerPanel.jsx'
+import PlaceSearch from './components/PlaceSearch.jsx'
 import { useUserLocation } from './hooks/useUserLocation.js'
 
 // How often the map re-checks for trucks that checked in or closed
@@ -23,6 +24,17 @@ const REFRESH_INTERVAL_MILLISECONDS = 30000
 
 export default function App() {
   const { userLocation, locationError, isUsingFallback } = useUserLocation()
+  // A place the user searched for ({ displayName, latitude, longitude }),
+  // or null to search around their own GPS location
+  const [searchedPlace, setSearchedPlace] = useState(null)
+  // Everything below (API query, radius circle, distances) is measured from here
+  const searchCenter = searchedPlace ?? userLocation
+  // Tells the map when to re-center: a new searched place, or GPS vs fallback.
+  // Plain GPS drift keeps the same key, so the map doesn't jump around.
+  let locationSourceKey = isUsingFallback ? 'fallback' : 'gps'
+  if (searchedPlace) {
+    locationSourceKey = `place:${searchedPlace.latitude},${searchedPlace.longitude}`
+  }
   // sliderRadiusMiles moves while dragging (redraws the circle);
   // radiusMiles only changes on release (triggers the API call)
   const [sliderRadiusMiles, setSliderRadiusMiles] = useState(5)
@@ -43,8 +55,8 @@ export default function App() {
 
     function loadNearbyFoodTrucks() {
       fetchNearbyFoodTrucks({
-        latitude: userLocation.latitude,
-        longitude: userLocation.longitude,
+        latitude: searchCenter.latitude,
+        longitude: searchCenter.longitude,
         radiusMiles,
         openOnly,
       })
@@ -74,7 +86,18 @@ export default function App() {
       isCurrentEffect = false
       clearInterval(refreshIntervalIdentifier)
     }
-  }, [userLocation.latitude, userLocation.longitude, radiusMiles, openOnly, refreshRequestCount])
+  }, [searchCenter.latitude, searchCenter.longitude, radiusMiles, openOnly, refreshRequestCount])
+
+  function handlePlaceSelected(chosenPlace) {
+    setSearchedPlace(chosenPlace)
+    // The selected truck probably isn't near the new place, so clear it
+    setSelectedTruckId(null)
+  }
+
+  function handleUseMyLocation() {
+    setSearchedPlace(null)
+    setSelectedTruckId(null)
+  }
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -97,7 +120,8 @@ export default function App() {
         onTrucksChanged={() => setRefreshRequestCount((previousCount) => previousCount + 1)}
       />
 
-      {isUsingFallback && (
+      {/* The GPS notice only matters while searching around the user's own location */}
+      {isUsingFallback && !searchedPlace && (
         <Alert severity="info">
           {locationError
             ? `Location unavailable (${locationError}). Showing a default area.`
@@ -120,8 +144,9 @@ export default function App() {
           ]}
         >
           <FoodTruckMap
-            userLocation={userLocation}
-            isUsingFallback={isUsingFallback}
+            searchCenter={searchCenter}
+            searchCenterLabel={searchedPlace ? searchedPlace.displayName : 'You are here'}
+            locationSourceKey={locationSourceKey}
             radiusMiles={sliderRadiusMiles}
             foodTruckFeatures={foodTruckFeatures}
             selectedTruckId={selectedTruckId}
@@ -130,7 +155,14 @@ export default function App() {
 
         <Paper square sx={{ width: { xs: '100%', md: 360 }, overflowY: 'auto' }}>
           <Box sx={{ padding: 2 }}>
-            <Typography gutterBottom>Search radius: {sliderRadiusMiles} mi</Typography>
+            <PlaceSearch
+              searchedPlaceName={searchedPlace?.displayName ?? null}
+              onPlaceSelected={handlePlaceSelected}
+              onUseMyLocation={handleUseMyLocation}
+            />
+            <Typography gutterBottom sx={{ marginTop: 2 }}>
+              Search radius: {sliderRadiusMiles} mi
+            </Typography>
             <Slider
               value={sliderRadiusMiles}
               min={1}
