@@ -2,9 +2,10 @@
 
 Code Platoon Group Project
 A real time food truck and pop-up discovery map where vendors drop live pins, update menus and sold-out items, and diners vote on crowd favorites.
+
 ## Features
 
-- **Map view and integration** – interactive map using OpenStreetMap or Google Maps
+- **Map view and integration** – Browse active food trucks nearby using Leaflet and interactive map OpenStreetMap or Google Maps
 - **Truck detail card** – tap a truck to see:
   - Name
   - Cuisine
