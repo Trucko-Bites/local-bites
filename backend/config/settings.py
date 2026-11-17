@@ -103,6 +103,29 @@ DATABASES = {
     }
 }
 
+# --- Cache: stored in Postgres so all gunicorn workers share it --------------
+# Place search uses it for cached results and the shared 1-request-per-second
+# Nominatim gate. The default in-memory cache is per worker, so 3 workers
+# would allow 3 requests per second. Table is created by entrypoint.sh.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache",
+    }
+}
+
+# --- Place search (OpenStreetMap Nominatim) ---------------------------------
+# Nominatim requires a User-Agent that identifies the app; generic library
+# defaults get blocked. Put a team contact in production.
+# "or" (not a get() default) so a blank NOMINATIM_USER_AGENT= line in .env also
+# falls back, instead of sending an empty header that Nominatim would block.
+NOMINATIM_USER_AGENT = (
+    os.environ.get("NOMINATIM_USER_AGENT")
+    or "LocalBites/1.0 (Code Platoon team project; https://github.com/Trucko-Bites/local-bites)"
+)
+# Limit results to these countries (comma-separated ISO codes); blank = worldwide
+PLACE_SEARCH_COUNTRY_CODES = os.environ.get("PLACE_SEARCH_COUNTRY_CODES", "us")
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
