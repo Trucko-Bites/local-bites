@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.contrib.gis.db import models as gis_models
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from django.db.models import Q
+from django.db.models import Avg, Count, Q
 from django.utils import timezone
 
 
@@ -14,6 +15,12 @@ class FoodTruckQuerySet(models.QuerySet):
         """
         return self.filter(is_open=True).filter(
             Q(open_until__isnull=True) | Q(open_until__gt=timezone.now())
+        )
+
+    def with_rating_summary(self):
+        return self.annotate(
+            average_rating=Avg("reviews__rating"),
+            review_count=Count("reviews", distinct=True),
         )
 
 
@@ -58,3 +65,35 @@ class FoodTruck(models.Model):
         if not self.is_open:
             return False
         return self.open_until is None or self.open_until > timezone.now()
+
+
+class Review(models.Model):
+
+    truck = models.ForeignKey(
+        FoodTruck,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="truck_reviews",
+    )
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    comment = models.TextField(blank=True)
+    photo_url = models.URLField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["truck", "user"],
+                name="unique_review_per_user_per_truck",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.truck.name} - {self.rating}★ by {self.user.username}"
