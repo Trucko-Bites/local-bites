@@ -78,7 +78,7 @@ Truck responses are GeoJSON. Each truck's `geometry.coordinates` is `[longitude,
 
 Login uses Django's session cookie. The React app and API share one origin (Vite's proxy locally, Caddy on EC2), so no tokens are stored in the browser and CSRF protection applies to every change.
 
-Load sample trucks around Redlands for development (single command; safe to run more than once, never touches hand-entered trucks):
+Load sample trucks around Redlands, Denver, Kansas City, New York, Chicago, Miami, and Seattle for development (single command; safe to run more than once, only adds trucks that are missing, never touches hand-entered trucks). Use place search (e.g. "Denver, CO") to jump to a city:
 
 ```bash
 docker compose exec backend python manage.py seed_food_trucks
