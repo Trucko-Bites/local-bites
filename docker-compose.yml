@@ -1,0 +1,59 @@
+# DEVELOPMENT stack (laptop): docker compose up --build
+#   React (hot reload):  http://localhost:5173
+#   Django API:          http://localhost:8000/api/trucks/
+#   Django admin:        http://localhost:8000/admin/
+
+services:
+  db:
+    image: postgis/postgis:18-3.6
+    # The PostGIS image is published for amd64 only; Apple Silicon Macs run it
+    # through Docker Desktop's emulation. Native on x86 EC2 instances (t3).
+    platform: linux/amd64
+    env_file: .env
+    volumes:
+      # PostGIS 18+ images store data at /var/lib/postgresql (not .../data)
+      - postgres_data:/var/lib/postgresql
+    ports:
+      # Host port 5433 (not 5432) so a local/homebrew Postgres on the laptop can keep
+      # running. Connect psql / DBeaver / DataGrip to localhost:5433. Inside Docker,
+      # Django still uses db:5432. NOT exposed at all in prod.
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      DJANGO_DEBUG: "true"
+    # Dev server with auto-reload instead of gunicorn
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/app   # edit code on the laptop, container reloads
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000   # Vite forwards /api here
+      VITE_WATCH_USE_POLLING: "true"   # hot reload works on Windows/macOS Docker (see vite.config.js)
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules  # keep Linux node_modules out of the laptop folder
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  frontend_node_modules:

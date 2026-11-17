@@ -1,0 +1,23 @@
+# GitHub automatically requests a review from the owner of any folder a pull
+# request changes. The LAST matching line wins.
+#
+# TODO: replace the two placeholder lines below with teammates' real GitHub
+# usernames (e.g. @janedoe). Until then, keep them commented out: GitHub flags
+# usernames that don't exist.
+
+# Everything not listed below: the repo owner
+*                       @BigZeeke
+
+# Geolocation / Django API
+/backend/               @BigZeeke
+
+# Frontend (React + MUI + Leaflet)
+# /frontend/            @FRONTEND_TEAMMATE_GITHUB_USERNAME
+
+# Scaffolding: Docker, Compose, Caddy, setup script, docs
+# /docker-compose*.yml  @SCAFFOLDING_TEAMMATE_GITHUB_USERNAME
+# /scripts/             @SCAFFOLDING_TEAMMATE_GITHUB_USERNAME   (setup.sh and setup.ps1)
+# /backend/Dockerfile   @SCAFFOLDING_TEAMMATE_GITHUB_USERNAME
+# /backend/entrypoint.sh @SCAFFOLDING_TEAMMATE_GITHUB_USERNAME
+# /frontend/Dockerfile  @SCAFFOLDING_TEAMMATE_GITHUB_USERNAME
+# /frontend/Caddyfile   @SCAFFOLDING_TEAMMATE_GITHUB_USERNAME
