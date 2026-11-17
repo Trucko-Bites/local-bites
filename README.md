@@ -17,3 +17,7 @@ A real time food truck and pop-up discovery map where vendors drop live pins, up
 Code Platoon Group Project
 
 Steve's first commit to branch
+
+## Development
+
+Setup, architecture, API reference and deployment: see [DEVELOPMENT.md](DEVELOPMENT.md). Team workflow: see [CONTRIBUTING.md](CONTRIBUTING.md).

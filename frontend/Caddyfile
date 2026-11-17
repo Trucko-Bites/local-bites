@@ -1,0 +1,25 @@
+# SITE_ADDRESS comes from .env:
+#   trucks.example.com  -> Caddy gets a free HTTPS certificate automatically
+#   :80                 -> plain HTTP (testing only; browser geolocation won't work)
+# If SITE_ADDRESS is unset, it defaults to :80
+{$SITE_ADDRESS::80} {
+	encode gzip
+
+	# API, Django admin, and admin static files go to the Django container
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+	handle /admin* {
+		reverse_proxy backend:8000
+	}
+	handle /django-static/* {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else is the React app; unknown paths fall back to index.html
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

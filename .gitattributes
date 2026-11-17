@@ -1,0 +1,8 @@
+# Let git normalize line endings for text files
+* text=auto
+
+# Shell scripts must keep Unix (LF) line endings even when committed from
+# Windows: with Windows (CRLF) endings, bash fails with "bad interpreter",
+# and a broken entrypoint.sh stops the backend container from starting.
+*.sh text eol=lf
+Caddyfile text eol=lf
