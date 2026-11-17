@@ -11,13 +11,15 @@ import Toolbar from '@mui/material/Toolbar'
 import Typography from '@mui/material/Typography'
 import LocalShippingIcon from '@mui/icons-material/LocalShipping'
 import StorefrontIcon from '@mui/icons-material/Storefront'
-
+import { useUserLocation } from './hooks/useUserLocation.js'
 import { fetchNearbyFoodTrucks } from './api/foodTrucks.js'
 import FoodTruckList from './components/FoodTruckList.jsx'
 import FoodTruckMap from './components/FoodTruckMap.jsx'
 import OwnerPanel from './components/OwnerPanel.jsx'
 import PlaceSearch from './components/PlaceSearch.jsx'
-import { useUserLocation } from './hooks/useUserLocation.js'
+
+import FoodTruckProfile from './components/FoodTruckProfile.jsx'
+
 
 // How often the map re-checks for trucks that checked in or closed
 const REFRESH_INTERVAL_MILLISECONDS = 30000
@@ -44,6 +46,10 @@ export default function App() {
   const [selectedTruckId, setSelectedTruckId] = useState(null)
   const [requestError, setRequestError] = useState(null)
   const [isOwnerPanelOpen, setIsOwnerPanelOpen] = useState(false)
+
+  const selectedTruck = foodTruckFeatures.find(
+  (truck) => truck.id === selectedTruckId
+)
   // Bumping this number re-runs the nearby query immediately (after a check-in)
   const [refreshRequestCount, setRefreshRequestCount] = useState(0)
 
@@ -119,7 +125,12 @@ export default function App() {
         onClose={() => setIsOwnerPanelOpen(false)}
         onTrucksChanged={() => setRefreshRequestCount((previousCount) => previousCount + 1)}
       />
-
+     {/* Food truck profile drawer */}
+      <FoodTruckProfile
+        truck={selectedTruck}
+        open={Boolean(selectedTruck)}
+        onClose={() => setSelectedTruckId(null)}
+      />
       {/* The GPS notice only matters while searching around the user's own location */}
       {isUsingFallback && !searchedPlace && (
         <Alert severity="info">
