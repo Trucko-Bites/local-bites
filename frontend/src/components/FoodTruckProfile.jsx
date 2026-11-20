@@ -12,11 +12,8 @@ import OpenInFullIcon from "@mui/icons-material/OpenInFull";
 import FoodTruckMenu from "./FoodTruckMenu.jsx";
 import Rating from "@mui/material/Rating";
 import Stack from "@mui/material/Stack";
-import CloseIcon from "@mui/icons-material/Close";
 import Button from "@mui/material/Button";
 import DirectionsIcon from "@mui/icons-material/Directions";
-import LocalShippingIcon from "@mui/icons-material/LocalShipping";
-import FoodTruckMenu from "./FoodTruckMenu.jsx";
 import FoodTruckReviews from "./FoodTruckReviews.jsx";
 
 export default function FoodTruckProfile({
@@ -32,7 +29,7 @@ export default function FoodTruckProfile({
     setIsExpanded(false);
     onClose();
   }
-  const properties = truck?.properties;
+
   const coordinates = truck?.geometry?.coordinates;
   const hasCoordinates = Array.isArray(coordinates) && coordinates.length === 2;
   const directionsUrl = hasCoordinates
@@ -51,11 +48,6 @@ export default function FoodTruckProfile({
             maxWidth: "100%",
             transition: (theme) => theme.transitions.create("width"),
           },
-      onClose={onClose}
-      PaperProps={{
-        sx: {
-          width: { xs: "100%", sm: 420 },
-          maxWidth: "100%",
         },
       }}
     >
@@ -91,9 +83,7 @@ export default function FoodTruckProfile({
         {properties && (
           <>
             <Box sx={{ textAlign: "center", mb: 3 }}>
-              <LocalShippingIcon
-                sx={{ fontSize: 64, color: "primary.main" }}
-              />
+              {/* Owner's cover photo, or the truck icon when there isn't one */}
               {properties.cover_photo_url ? (
                 <Box
                   component="img"
