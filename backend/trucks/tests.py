@@ -11,8 +11,8 @@ from django.core.management import call_command
 from django.utils import timezone
 from rest_framework.test import APIClient, APITestCase
 
-from .management.commands.seed_food_trucks import SAMPLE_FOOD_TRUCKS, SAMPLE_NAME_PREFIX
-from .models import FoodTruck
+from .management.commands.seed_food_trucks import SAMPLE_FOOD_TRUCKS, SAMPLE_TRUCK_NAMES
+from .models import FoodTruck, Review
 from .place_search import RATE_GATE_CACHE_KEY
 
 # Reference point: downtown Redlands, CA (longitude, latitude)
@@ -335,7 +335,9 @@ class SeedFoodTrucksCommandTests(APITestCase):
 
     def test_creates_every_sample_truck(self):
         self.run_seed_command()
-        self.assertEqual(FoodTruck.objects.filter(name__startswith=SAMPLE_NAME_PREFIX).count(), len(SAMPLE_FOOD_TRUCKS))
+        self.assertEqual(FoodTruck.objects.filter(name__in=SAMPLE_TRUCK_NAMES).count(), len(SAMPLE_FOOD_TRUCKS))
+        # Names are plain now, with no "[Sample]" tag
+        self.assertFalse(FoodTruck.objects.filter(name__startswith="[Sample]").exists())
 
     def test_each_city_shows_only_its_own_trucks_in_a_nearby_search(self):
         self.run_seed_command()
@@ -361,3 +363,43 @@ class SeedFoodTrucksCommandTests(APITestCase):
         self.run_seed_command("--replace")
         self.assertTrue(FoodTruck.objects.filter(pk=hand_entered_truck.pk).exists())
         self.assertEqual(FoodTruck.objects.count(), len(SAMPLE_FOOD_TRUCKS) + 1)
+
+
+class RemoveSamplePrefixMigrationTests(APITestCase):
+    """Runs the 0005 data migration's rename function against test rows."""
+
+    def run_rename(self):
+        # Migration modules start with a digit, so import them by string
+        from importlib import import_module
+
+        from django.apps import apps as installed_apps
+
+        migration_module = import_module("trucks.migrations.0005_remove_sample_name_prefix")
+        migration_module.remove_sample_prefix(installed_apps, schema_editor=None)
+
+    def create_truck(self, truck_name):
+        return FoodTruck.objects.create(name=truck_name, location=Point(-104.99, 39.74, srid=4326))
+
+    def test_renames_tagged_truck_in_place_and_keeps_its_reviews(self):
+        tagged_truck = self.create_truck("[Sample] Downtown Tacos")
+        reviewer = get_user_model().objects.create_user(username="reviewer", password="test-password-123")
+        Review.objects.create(truck=tagged_truck, user=reviewer, rating=5)
+        self.run_rename()
+        tagged_truck.refresh_from_db()
+        self.assertEqual(tagged_truck.name, "Downtown Tacos")
+        # Same row, so the review is still attached
+        self.assertEqual(tagged_truck.reviews.count(), 1)
+
+    def test_leaves_tagged_truck_alone_when_plain_name_already_exists(self):
+        self.create_truck("Downtown Tacos")
+        tagged_truck = self.create_truck("[Sample] Downtown Tacos")
+        self.run_rename()
+        tagged_truck.refresh_from_db()
+        self.assertEqual(tagged_truck.name, "[Sample] Downtown Tacos")
+        self.assertEqual(FoodTruck.objects.count(), 2)
+
+    def test_does_not_touch_hand_entered_trucks(self):
+        hand_entered_truck = self.create_truck("Real Owner Truck")
+        self.run_rename()
+        hand_entered_truck.refresh_from_db()
+        self.assertEqual(hand_entered_truck.name, "Real Owner Truck")

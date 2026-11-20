@@ -3,11 +3,12 @@ Loads sample food trucks so the map has something to show during development.
 
 Usage (from the project root):
     docker compose exec backend python manage.py seed_food_trucks
-    docker compose exec backend python manage.py seed_food_trucks --replace
+    docker compose exec backend python manage.py seed_food_trucks --replace   # also deletes reviews on sample trucks
 
-Sample trucks only touch rows whose names start with "[Sample]",
-so trucks entered by hand in the admin are never changed or deleted.
-Running it again only adds sample trucks that don't exist yet.
+Sample trucks are recognized by name (the list below), so trucks entered
+by hand in the admin are never changed or deleted unless one has exactly
+the same name as a sample truck. Running it again only adds sample trucks
+that don't exist yet.
 
 Covers Redlands CA plus Denver, Kansas City, New York, Chicago, Miami, and
 Seattle, so place search (e.g. "Denver, CO") has trucks to show outside Redlands.
@@ -18,8 +19,6 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from trucks.models import FoodTruck
-
-SAMPLE_NAME_PREFIX = "[Sample] "
 
 # (name, cuisine, latitude, longitude, is_open), grouped by area.
 # A spread of distances from each downtown lets the radius slider
@@ -101,6 +100,9 @@ SAMPLE_FOOD_TRUCKS = [
     ("Ballard Smoked Salmon Wagon", "Scandinavian", 47.6687, -122.3847, True),    # ~5.0 mi
 ]
 
+# Names the --replace option is allowed to delete
+SAMPLE_TRUCK_NAMES = [truck_name for truck_name, *_ in SAMPLE_FOOD_TRUCKS]
+
 
 class Command(BaseCommand):
     help = "Create sample food trucks in Redlands and six other US cities for local development."
@@ -109,20 +111,28 @@ class Command(BaseCommand):
         parser.add_argument(
             "--replace",
             action="store_true",
-            help="Delete existing sample trucks first (hand-entered trucks are kept).",
+            help="Delete existing sample trucks, and any reviews on them, first (hand-entered trucks are kept).",
         )
 
     @transaction.atomic
     def handle(self, *args, **options):
         if options["replace"]:
-            deleted_count, _ = FoodTruck.objects.filter(name__startswith=SAMPLE_NAME_PREFIX).delete()
-            self.stdout.write(f"Removed {deleted_count} existing sample trucks.")
+            # Only trucks whose names are on the sample list are deleted
+            # delete() also counts related rows it removes (reviews), so read
+            # the per-model breakdown to report trucks only
+            _, deleted_by_model = FoodTruck.objects.filter(name__in=SAMPLE_TRUCK_NAMES).delete()
+            deleted_truck_count = deleted_by_model.get("trucks.FoodTruck", 0)
+            deleted_review_count = deleted_by_model.get("trucks.Review", 0)
+            self.stdout.write(
+                f"Removed {deleted_truck_count} existing sample trucks "
+                f"and {deleted_review_count} reviews on them."
+            )
 
         created_count = 0
         for truck_name, cuisine, latitude, longitude, is_open in SAMPLE_FOOD_TRUCKS:
             # get_or_create makes the command safe to run more than once
             _, was_created = FoodTruck.objects.get_or_create(
-                name=f"{SAMPLE_NAME_PREFIX}{truck_name}",
+                name=truck_name,
                 defaults={
                     "cuisine": cuisine,
                     # GEOS points are (longitude, latitude)
