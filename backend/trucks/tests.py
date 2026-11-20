@@ -1,14 +1,17 @@
 import json
 from datetime import timedelta
+from io import StringIO
 from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point
 from django.core.cache import cache
+from django.core.management import call_command
 from django.utils import timezone
 from rest_framework.test import APIClient, APITestCase
 
+from .management.commands.seed_food_trucks import SAMPLE_FOOD_TRUCKS, SAMPLE_NAME_PREFIX
 from .models import FoodTruck
 from .place_search import RATE_GATE_CACHE_KEY
 
@@ -311,3 +314,50 @@ class PlaceSearchTests(APITestCase):
         response = self.search("Fontana")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_urlopen.call_count, 2)
+
+
+# Downtown point for each seeded city (latitude, longitude) and how many
+# sample trucks the seed command puts within 10 miles of it
+SEEDED_CITY_CENTERS = {
+    "Denver, CO": (39.7392, -104.9903, 9),
+    "Kansas City, MO": (39.0997, -94.5786, 9),
+    "New York, NY": (40.7128, -74.0060, 9),
+    "Chicago, IL": (41.8781, -87.6298, 9),
+    "Miami, FL": (25.7741, -80.1936, 8),
+    "Seattle, WA": (47.6062, -122.3321, 9),
+}
+
+
+class SeedFoodTrucksCommandTests(APITestCase):
+    def run_seed_command(self, *arguments):
+        # Swallow the command's progress messages so test output stays clean
+        call_command("seed_food_trucks", *arguments, stdout=StringIO())
+
+    def test_creates_every_sample_truck(self):
+        self.run_seed_command()
+        self.assertEqual(FoodTruck.objects.filter(name__startswith=SAMPLE_NAME_PREFIX).count(), len(SAMPLE_FOOD_TRUCKS))
+
+    def test_each_city_shows_only_its_own_trucks_in_a_nearby_search(self):
+        self.run_seed_command()
+        for city_name, (latitude, longitude, expected_truck_count) in SEEDED_CITY_CENTERS.items():
+            with self.subTest(city=city_name):
+                response = self.client.get(
+                    "/api/trucks/nearby/",
+                    {"latitude": latitude, "longitude": longitude, "radius_miles": 10},
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(len(response.data["features"]), expected_truck_count)
+
+    def test_running_twice_does_not_duplicate_trucks(self):
+        self.run_seed_command()
+        self.run_seed_command()
+        self.assertEqual(FoodTruck.objects.count(), len(SAMPLE_FOOD_TRUCKS))
+
+    def test_replace_keeps_hand_entered_trucks(self):
+        hand_entered_truck = FoodTruck.objects.create(
+            name="Real Owner Truck", location=Point(-104.99, 39.74, srid=4326)
+        )
+        self.run_seed_command()
+        self.run_seed_command("--replace")
+        self.assertTrue(FoodTruck.objects.filter(pk=hand_entered_truck.pk).exists())
+        self.assertEqual(FoodTruck.objects.count(), len(SAMPLE_FOOD_TRUCKS) + 1)
