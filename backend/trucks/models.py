@@ -30,7 +30,10 @@ class FoodTruck(models.Model):
     name = models.CharField(max_length=120)
     cuisine = models.CharField(max_length=80, blank=True)
     description = models.TextField(blank=True)
-
+    name = models.CharField(max_length=120)
+    cuisine = models.CharField(max_length=80, blank=True)
+    description = models.TextField(blank=True)
+    cover_photo_url = models.URLField(max_length=500, blank=True)
     # geography=True stores the point on the earth's surface, so distance
     # lookups are calculated in meters instead of degrees.
     # srid=4326 is plain longitude/latitude (what phones and Leaflet use).

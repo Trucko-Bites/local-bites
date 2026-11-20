@@ -56,7 +56,24 @@ export default function FoodTruckProfile({
         {properties && (
           <>
             <Box sx={{ textAlign: "center", mb: 3 }}>
-              <LocalShippingIcon sx={{ fontSize: 64, color: "primary.main" }} />
+              {properties.cover_photo_url ? (
+                <Box
+                  component="img"
+                  src={properties.cover_photo_url}
+                  alt={properties.name}
+                  sx={{
+                    width: "100%",
+                    height: 180,
+                    objectFit: "cover",
+                    borderRadius: 2,
+                    mb: 1,
+                  }}
+                />
+              ) : (
+                <LocalShippingIcon
+                  sx={{ fontSize: 64, color: "primary.main" }}
+                />
+              )}
 
               <Typography variant="h5" sx={{ mt: 1 }}>
                 {properties.name}
@@ -71,6 +88,7 @@ export default function FoodTruckProfile({
                 color={properties.is_open ? "success" : "default"}
                 sx={{ mt: 2 }}
               />
+
               <Stack
                 direction="row"
                 spacing={0.75}

@@ -39,6 +39,7 @@ class FoodTruckSerializer(GeoFeatureModelSerializer):
             "distance_miles",
             "average_rating",
             "review_count",
+            "cover_photo_url",
         ]
         # Opening, closing and moving happen through check-in / check-out only
         read_only_fields = ["open_until", "location_updated_at"]
