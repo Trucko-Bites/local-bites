@@ -1,9 +1,15 @@
+import { useState } from "react";
 import Drawer from "@mui/material/Drawer";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
 import Chip from "@mui/material/Chip";
 import Divider from "@mui/material/Divider";
+import CloseIcon from "@mui/icons-material/Close";
+import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import OpenInFullIcon from "@mui/icons-material/OpenInFull";
+import FoodTruckMenu from "./FoodTruckMenu.jsx";
 import Rating from "@mui/material/Rating";
 import Stack from "@mui/material/Stack";
 import CloseIcon from "@mui/icons-material/Close";
@@ -19,6 +25,13 @@ export default function FoodTruckProfile({
   onClose,
   onReviewSubmitted,
 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const properties = truck?.properties;
+
+  function handleClose() {
+    setIsExpanded(false);
+    onClose();
+  }
   const properties = truck?.properties;
   const coordinates = truck?.geometry?.coordinates;
   const hasCoordinates = Array.isArray(coordinates) && coordinates.length === 2;
@@ -30,6 +43,14 @@ export default function FoodTruckProfile({
     <Drawer
       anchor="right"
       open={open}
+      onClose={handleClose}
+      slotProps={{
+        paper: {
+          sx: {
+            width: isExpanded ? "100vw" : { xs: "100%", sm: 420 },
+            maxWidth: "100%",
+            transition: (theme) => theme.transitions.create("width"),
+          },
       onClose={onClose}
       PaperProps={{
         sx: {
@@ -48,14 +69,31 @@ export default function FoodTruckProfile({
           }}
         >
           <Typography variant="h6">Food Truck Profile</Typography>
-          <IconButton onClick={onClose} aria-label="Close profile">
-            <CloseIcon />
-          </IconButton>
+
+          <Box>
+            <IconButton
+              onClick={() => setIsExpanded((expanded) => !expanded)}
+              aria-label={isExpanded ? "Minimize profile" : "Expand profile"}
+            >
+              {isExpanded ? (
+                <CloseFullscreenIcon />
+              ) : (
+                <OpenInFullIcon />
+              )}
+            </IconButton>
+
+            <IconButton onClick={handleClose} aria-label="Close profile">
+              <CloseIcon />
+            </IconButton>
+          </Box>
         </Box>
 
         {properties && (
           <>
             <Box sx={{ textAlign: "center", mb: 3 }}>
+              <LocalShippingIcon
+                sx={{ fontSize: 64, color: "primary.main" }}
+              />
               {properties.cover_photo_url ? (
                 <Box
                   component="img"

@@ -161,6 +161,7 @@ export default function App() {
             radiusMiles={sliderRadiusMiles}
             foodTruckFeatures={foodTruckFeatures}
             selectedTruckId={selectedTruckId}
+            onSelectTruck={setSelectedTruckId}
           />
         </Box>
 
