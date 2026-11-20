@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import Drawer from '@mui/material/Drawer'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
@@ -10,16 +11,58 @@ import FoodTruckMenu from './FoodTruckMenu.jsx'
 
 export default function FoodTruckProfile({ truck, open, onClose }) {
   const properties = truck?.properties
+=======
+import { useState } from "react";
+import Drawer from "@mui/material/Drawer";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import IconButton from "@mui/material/IconButton";
+import Chip from "@mui/material/Chip";
+import Divider from "@mui/material/Divider";
+import Rating from "@mui/material/Rating";
+import Stack from "@mui/material/Stack";
+import CloseIcon from "@mui/icons-material/Close";
+import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import OpenInFullIcon from "@mui/icons-material/OpenInFull";
+import FoodTruckMenu from "./FoodTruckMenu.jsx";
+import FoodTruckReviews from "./FoodTruckReviews.jsx";
+
+export default function FoodTruckProfile({
+  truck,
+  open,
+  onClose,
+  onReviewSubmitted,
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const properties = truck?.properties;
+>>>>>>> Stashed changes
+
+  function handleClose() {
+    setIsExpanded(false);
+    onClose();
+  }
 
   return (
     <Drawer
       anchor="right"
       open={open}
+<<<<<<< Updated upstream
       onClose={onClose}
       PaperProps={{
         sx: {
           width: { xs: '100%', sm: 420 },
           maxWidth: '100%',
+=======
+      onClose={handleClose}
+      slotProps={{
+        paper: {
+          sx: {
+            width: isExpanded ? "100vw" : { xs: "100%", sm: 420 },
+            maxWidth: "100%",
+            transition: (theme) => theme.transitions.create("width"),
+          },
+>>>>>>> Stashed changes
         },
       }}
     >
@@ -33,9 +76,17 @@ export default function FoodTruckProfile({ truck, open, onClose }) {
           }}
         >
           <Typography variant="h6">Food Truck Profile</Typography>
-          <IconButton onClick={onClose} aria-label="Close profile">
-            <CloseIcon />
-          </IconButton>
+          <Box>
+            <IconButton
+              onClick={() => setIsExpanded((expanded) => !expanded)}
+              aria-label={isExpanded ? "Minimize profile" : "Expand profile"}
+            >
+              {isExpanded ? <CloseFullscreenIcon /> : <OpenInFullIcon />}
+            </IconButton>
+            <IconButton onClick={handleClose} aria-label="Close profile">
+              <CloseIcon />
+            </IconButton>
+          </Box>
         </Box>
 
         {properties && (

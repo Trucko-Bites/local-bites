@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import Button from '@mui/material/Button'
 import { Circle, CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet'
 
 const METERS_PER_MILE = 1609.344
@@ -55,6 +56,7 @@ export default function FoodTruckMap({
   radiusMiles,
   foodTruckFeatures,
   selectedTruckId,
+  onSelectTruck,
 }) {
   // Leaflet wants [latitude, longitude]
   const searchCenterPosition = [searchCenter.latitude, searchCenter.longitude]
@@ -101,6 +103,10 @@ export default function FoodTruckMap({
               {truckProperties.cuisine}
               <br />
               {truckProperties.distance_miles} mi away · {truckProperties.is_open ? 'Open' : 'Closed'}
+              <br />
+              <Button size="small" sx={{ marginTop: 1 }} onClick={() => onSelectTruck(truckFeature.id)}>
+                View Details
+              </Button>
             </Popup>
           </CircleMarker>
         )
