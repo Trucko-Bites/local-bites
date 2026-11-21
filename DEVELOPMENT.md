@@ -54,13 +54,14 @@ local-bites/
 |---|---|---|
 | GET | `/api/trucks/nearby/?latitude=34.0556&longitude=-117.1825&radius_miles=5` | Closest first, max 50 mi, optional `open_only=true` |
 | GET | `/api/trucks/` | Paginated GeoJSON |
-| POST | `/api/trucks/` | Login required; creator becomes owner |
+| POST | `/api/trucks/` | Staff only; creator becomes owner (reassign the owner in Django admin) |
 | PUT/PATCH/DELETE | `/api/trucks/<id>/` | Owner or staff only |
 | GET | `/api/trucks/mine/` | Trucks the logged-in user can check in (staff: all) |
 | POST | `/api/trucks/<id>/check-in/` | Owner or staff. Body: `latitude`, `longitude`, `open_until` (ISO time, within 18 hours) |
 | POST | `/api/trucks/<id>/check-out/` | Owner or staff. Closes now |
 | GET | `/api/auth/csrf/` | Sets the `csrftoken` cookie |
 | POST | `/api/auth/login/` | `username`, `password`; needs `X-CSRFToken` header |
+| POST | `/api/auth/register/` | `username`, `email`, `password`, `password_confirmation`; needs `X-CSRFToken` header. Creates a customer account and logs it in (201). Limited to 5 attempts per hour per IP by default (`REGISTER_THROTTLE_RATE` in `.env`); 429 after that |
 | POST | `/api/auth/logout/` | |
 | GET | `/api/auth/me/` | Current user, or 403 when logged out |
 | GET | `/api/health/` | Health check |

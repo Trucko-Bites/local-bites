@@ -170,8 +170,20 @@ LOGGING = {
 
 # --- Django REST Framework --------------------------------------------------
 REST_FRAMEWORK = {
-    # Anyone can read trucks; only logged-in users (truck owners) can change them
+    # Anyone can read; changing anything needs a login (views can tighten this further)
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
+    # Rate limits for views that set throttle_scope. Counts are kept in the
+    # default cache (the Postgres cache table), so all gunicorn workers share them.
+    "DEFAULT_THROTTLE_RATES": {
+        # Sign-up attempts per client IP. A classroom on one Wi-Fi network shares
+        # an IP, so raise this in .env for demo day (e.g. 50/hour).
+        "register": os.environ.get("REGISTER_THROTTLE_RATE") or "5/hour",
+    },
+    # One proxy (Caddy in prod, Vite in dev) sits in front of Django. With 1,
+    # throttling uses the last X-Forwarded-For address, which Caddy writes
+    # itself, so a client can't fake its IP by sending its own header.
+    # Without the header (Vite in dev), Django's REMOTE_ADDR is used.
+    "NUM_PROXIES": 1,
 }
