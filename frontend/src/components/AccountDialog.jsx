@@ -46,7 +46,10 @@ function LogInForm({ onLoggedIn }) {
         <TextField
           label="Username"
           value={username}
-          onChange={(event) => setUsername(event.target.value)}
+          onChange={(event) => {
+            setUsername(event.target.value)
+            setFormError(null) // the old error was about what was typed before
+          }}
           autoComplete="username"
           required
           autoFocus
@@ -55,7 +58,10 @@ function LogInForm({ onLoggedIn }) {
           label="Password"
           type="password"
           value={password}
-          onChange={(event) => setPassword(event.target.value)}
+          onChange={(event) => {
+            setPassword(event.target.value)
+            setFormError(null)
+          }}
           autoComplete="current-password"
           required
         />
@@ -79,6 +85,18 @@ function SignUpForm({ onSignedUp }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isFormFilledIn = username && email && password && passwordConfirmation
+
+  /**
+   * Removes server messages for the given fields as soon as the user edits them,
+   * so an error never sits under a value it wasn't about. Other fields keep theirs.
+   */
+  function clearFieldErrors(...fieldNames) {
+    setFieldErrors((previousFieldErrors) => {
+      const remainingFieldErrors = { ...previousFieldErrors }
+      fieldNames.forEach((fieldName) => delete remainingFieldErrors[fieldName])
+      return remainingFieldErrors
+    })
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -112,7 +130,10 @@ function SignUpForm({ onSignedUp }) {
         <TextField
           label="Username"
           value={username}
-          onChange={(event) => setUsername(event.target.value)}
+          onChange={(event) => {
+            setUsername(event.target.value)
+            clearFieldErrors('username')
+          }}
           autoComplete="username"
           required
           autoFocus
@@ -123,7 +144,10 @@ function SignUpForm({ onSignedUp }) {
           label="Email"
           type="email"
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          onChange={(event) => {
+            setEmail(event.target.value)
+            clearFieldErrors('email')
+          }}
           autoComplete="email"
           required
           error={Boolean(emailError)}
@@ -133,7 +157,11 @@ function SignUpForm({ onSignedUp }) {
           label="Password"
           type="password"
           value={password}
-          onChange={(event) => setPassword(event.target.value)}
+          onChange={(event) => {
+            setPassword(event.target.value)
+            // A new password can also fix "Passwords do not match."
+            clearFieldErrors('password', 'password_confirmation')
+          }}
           autoComplete="new-password"
           required
           error={Boolean(passwordError)}
@@ -143,7 +171,10 @@ function SignUpForm({ onSignedUp }) {
           label="Confirm password"
           type="password"
           value={passwordConfirmation}
-          onChange={(event) => setPasswordConfirmation(event.target.value)}
+          onChange={(event) => {
+            setPasswordConfirmation(event.target.value)
+            clearFieldErrors('password_confirmation')
+          }}
           autoComplete="new-password"
           required
           error={Boolean(passwordConfirmationError)}
