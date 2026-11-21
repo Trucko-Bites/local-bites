@@ -23,6 +23,7 @@ export default function FoodTruckProfile({
   onReviewSubmitted,
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const properties = truck?.properties;
 
   function handleClose() {
     setIsExpanded(false);
