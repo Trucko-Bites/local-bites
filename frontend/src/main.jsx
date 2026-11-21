@@ -4,6 +4,7 @@ import CssBaseline from '@mui/material/CssBaseline'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import 'leaflet/dist/leaflet.css' // Leaflet's map styles; the map renders broken without this
 import App from './App.jsx'
+import AuthProvider from './auth/AuthProvider.jsx'
 
 const FOOD_TRUCK_ORANGE = '#e65100'
 
@@ -23,7 +24,10 @@ createRoot(document.getElementById('root')).render(
     <ThemeProvider theme={appTheme} defaultMode="system">
       {/* CssBaseline resets browser default styles and sets the page background per mode */}
       <CssBaseline enableColorScheme />
-      <App />
+      {/* AuthProvider checks who is logged in once and shares it with the whole app */}
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </ThemeProvider>
   </StrictMode>,
 )
