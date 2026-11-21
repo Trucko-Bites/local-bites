@@ -166,3 +166,37 @@ class FoodTruckViewSet(viewsets.ModelViewSet):
             output_serializer.data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+    @action(
+        detail=True,
+        methods=["patch", "delete"],
+        url_path=r"reviews/(?P<review_id>[^/.]+)",
+        permission_classes=[IsAuthenticated],
+    )
+    def review_detail(self, request, pk=None, review_id=None):
+        """
+        PATCH  /api/trucks/<id>/reviews/<review_id>/ -- edit own review
+        DELETE /api/trucks/<id>/reviews/<review_id>/ -- delete own review
+        """
+        food_truck = self.get_object()
+        review = food_truck.reviews.filter(pk=review_id).first()
+        if review is None:
+            return Response(
+                {"detail": "Review not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not (request.user.is_staff or review.user_id == request.user.id):
+            return Response(
+                {"detail": "You can only modify your own review."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if request.method == "DELETE":
+            review.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = ReviewSerializer(review, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

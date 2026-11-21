@@ -4,25 +4,44 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
+import IconButton from "@mui/material/IconButton";
 import Rating from "@mui/material/Rating";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 
+import { fetchCurrentUser } from "../api/auth.js";
 import {
+  deleteTruckReview,
   fetchTruckReviews,
   submitTruckReview,
+  updateTruckReview,
   uploadReviewPhotoToCloudinary,
 } from "../api/reviews.js";
 
 export default function FoodTruckReviews({ truckId, onReviewSubmitted }) {
+  const [currentUser, setCurrentUser] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // New review form state
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [photoFile, setPhotoFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Inline edit state
+  const [editingReviewId, setEditingReviewId] = useState(null);
+  const [editRating, setEditRating] = useState(5);
+  const [editComment, setEditComment] = useState("");
+  const [editPhotoUrl, setEditPhotoUrl] = useState("");
+  const [editPhotoFile, setEditPhotoFile] = useState(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deletingReviewId, setDeletingReviewId] = useState(null);
+
   const [errorMessage, setErrorMessage] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
 
@@ -31,10 +50,16 @@ export default function FoodTruckReviews({ truckId, onReviewSubmitted }) {
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+    setEditingReviewId(null);
 
-    fetchTruckReviews(truckId)
-      .then((data) => {
-        if (isCurrent) setReviews(data);
+    Promise.all([
+      fetchTruckReviews(truckId),
+      fetchCurrentUser().catch(() => null),
+    ])
+      .then(([reviewsData, user]) => {
+        if (!isCurrent) return;
+        setReviews(reviewsData);
+        setCurrentUser(user);
       })
       .catch((error) => {
         if (isCurrent) setErrorMessage(error.message);
@@ -71,7 +96,6 @@ export default function FoodTruckReviews({ truckId, onReviewSubmitted }) {
         photoUrl,
       });
 
-      // Put the new/updated review at the top without duplicates
       setReviews((previousReviews) => [
         savedReview,
         ...previousReviews.filter((item) => item.id !== savedReview.id),
@@ -87,6 +111,87 @@ export default function FoodTruckReviews({ truckId, onReviewSubmitted }) {
       setErrorMessage(error.message);
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  function startEditing(review) {
+    setEditingReviewId(review.id);
+    setEditRating(review.rating);
+    setEditComment(review.comment || "");
+    setEditPhotoUrl(review.photo_url || "");
+    setEditPhotoFile(null);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }
+
+  function cancelEditing() {
+    setEditingReviewId(null);
+    setEditPhotoFile(null);
+  }
+
+  async function handleSaveEdit(reviewId) {
+    if (!editRating) {
+      setErrorMessage("Please pick a star rating.");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      let finalPhotoUrl = editPhotoUrl;
+      if (editPhotoFile) {
+        finalPhotoUrl = await uploadReviewPhotoToCloudinary(editPhotoFile);
+      }
+
+      const updatedReview = await updateTruckReview(truckId, reviewId, {
+        rating: editRating,
+        comment: editComment,
+        photoUrl: finalPhotoUrl,
+      });
+
+      setReviews((previousReviews) =>
+        previousReviews.map((item) =>
+          item.id === reviewId ? updatedReview : item,
+        ),
+      );
+      setEditingReviewId(null);
+      setEditPhotoFile(null);
+      setSuccessMessage("Review updated!");
+
+      if (onReviewSubmitted) {
+        onReviewSubmitted();
+      }
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  async function handleDelete(reviewId) {
+    setDeletingReviewId(reviewId);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await deleteTruckReview(truckId, reviewId);
+      setReviews((previousReviews) =>
+        previousReviews.filter((item) => item.id !== reviewId),
+      );
+      if (editingReviewId === reviewId) {
+        setEditingReviewId(null);
+      }
+      setSuccessMessage("Review deleted.");
+
+      if (onReviewSubmitted) {
+        onReviewSubmitted();
+      }
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setDeletingReviewId(null);
     }
   }
 
@@ -176,40 +281,149 @@ export default function FoodTruckReviews({ truckId, onReviewSubmitted }) {
         </Typography>
       ) : (
         <Stack spacing={2} divider={<Divider />}>
-          {reviews.map((review) => (
-            <Box key={review.id}>
-              <Stack
-                direction="row"
-                spacing={1}
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography variant="subtitle2">{review.username}</Typography>
-                <Rating value={review.rating} readOnly size="small" />
-              </Stack>
+          {reviews.map((review) => {
+            const canModify =
+              currentUser &&
+              (currentUser.is_staff ||
+                currentUser.username === review.username);
+            const isEditing = editingReviewId === review.id;
 
-              {review.comment && (
-                <Typography variant="body2" sx={{ mt: 0.5 }}>
-                  {review.comment}
-                </Typography>
-              )}
+            return (
+              <Box key={review.id}>
+                {isEditing ? (
+                  <Stack spacing={1.5}>
+                    <Typography variant="subtitle2">
+                      Edit your review
+                    </Typography>
+                    <Rating
+                      value={editRating}
+                      onChange={(_event, newRating) => setEditRating(newRating)}
+                    />
+                    <TextField
+                      fullWidth
+                      multiline
+                      minRows={2}
+                      size="small"
+                      label="Comment"
+                      value={editComment}
+                      onChange={(event) => setEditComment(event.target.value)}
+                    />
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Button
+                        component="label"
+                        variant="outlined"
+                        size="small"
+                        startIcon={<PhotoCameraIcon />}
+                      >
+                        {editPhotoFile || editPhotoUrl
+                          ? "Replace Photo"
+                          : "Add Photo"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={(event) =>
+                            setEditPhotoFile(event.target.files?.[0] || null)
+                          }
+                        />
+                      </Button>
+                      {(editPhotoUrl || editPhotoFile) && (
+                        <Button
+                          size="small"
+                          color="inherit"
+                          onClick={() => {
+                            setEditPhotoUrl("");
+                            setEditPhotoFile(null);
+                          }}
+                        >
+                          Remove Photo
+                        </Button>
+                      )}
+                    </Stack>
+                    {editPhotoFile && (
+                      <Typography variant="caption" color="text.secondary">
+                        New photo: {editPhotoFile.name}
+                      </Typography>
+                    )}
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disabled={isSavingEdit}
+                        onClick={() => handleSaveEdit(review.id)}
+                      >
+                        {isSavingEdit ? "Saving..." : "Save"}
+                      </Button>
+                      <Button
+                        size="small"
+                        disabled={isSavingEdit}
+                        onClick={cancelEditing}
+                      >
+                        Cancel
+                      </Button>
+                    </Stack>
+                  </Stack>
+                ) : (
+                  <>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      justifyContent="space-between"
+                      alignItems="center"
+                    >
+                      <Typography variant="subtitle2">
+                        {review.username}
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Rating value={review.rating} readOnly size="small" />
+                        {canModify && (
+                          <>
+                            <IconButton
+                              size="small"
+                              aria-label="Edit review"
+                              onClick={() => startEditing(review)}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              aria-label="Delete review"
+                              color="error"
+                              disabled={deletingReviewId === review.id}
+                              onClick={() => handleDelete(review.id)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        )}
+                      </Stack>
+                    </Stack>
 
-              {review.photo_url && (
-                <Box
-                  component="img"
-                  src={review.photo_url}
-                  alt={`Food photo by ${review.username}`}
-                  sx={{
-                    mt: 1,
-                    width: "100%",
-                    maxHeight: 200,
-                    objectFit: "cover",
-                    borderRadius: 1,
-                  }}
-                />
-              )}
-            </Box>
-          ))}
+                    {review.comment && (
+                      <Typography variant="body2" sx={{ mt: 0.5 }}>
+                        {review.comment}
+                      </Typography>
+                    )}
+
+                    {review.photo_url && (
+                      <Box
+                        component="img"
+                        src={review.photo_url}
+                        alt={`Food photo by ${review.username}`}
+                        sx={{
+                          mt: 1,
+                          width: "100%",
+                          maxHeight: 200,
+                          objectFit: "cover",
+                          borderRadius: 1,
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+              </Box>
+            );
+          })}
         </Stack>
       )}
     </Box>
