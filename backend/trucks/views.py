@@ -50,7 +50,8 @@ class FoodTruckViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOwnerOrStaffOrReadOnly]
 
     def perform_create(self, serializer):
-        # Whoever creates the truck owns it
+        # Only staff can create (see IsOwnerOrStaffOrReadOnly). The creator starts
+        # as the owner; staff hand the truck to its real owner in Django admin.
         serializer.save(owner=self.request.user)
 
     @action(detail=False, methods=["get"], permission_classes=[AllowAny])

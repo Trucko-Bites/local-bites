@@ -4,6 +4,7 @@ from io import StringIO
 from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point
 from django.core.cache import cache
@@ -18,6 +19,14 @@ from .place_search import RATE_GATE_CACHE_KEY
 # Reference point: downtown Redlands, CA (longitude, latitude)
 REDLANDS_LONGITUDE = -117.1825
 REDLANDS_LATITUDE = 34.0556
+
+
+# A new truck as GeoJSON, the shape FoodTruckSerializer accepts
+NEW_TRUCK_FEATURE = {
+    "type": "Feature",
+    "geometry": {"type": "Point", "coordinates": [-117.1825, 34.0556]},
+    "properties": {"name": "Brand New Truck", "cuisine": "Tacos"},
+}
 
 
 class NearbyFoodTruckTests(APITestCase):
@@ -79,6 +88,23 @@ class NearbyFoodTruckTests(APITestCase):
     def test_anonymous_user_cannot_create_truck(self):
         response = self.client.post("/api/trucks/", {"name": "Sneaky Truck"}, format="json")
         self.assertEqual(response.status_code, 403)
+
+    def test_regular_user_cannot_create_truck(self):
+        # Anyone can sign up, so a plain customer account must not be able to add trucks
+        customer = get_user_model().objects.create_user(username="hungry_customer", password="test-password-123")
+        self.client.force_login(customer)
+        response = self.client.post("/api/trucks/", NEW_TRUCK_FEATURE, format="json")
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(FoodTruck.objects.filter(name="Brand New Truck").exists())
+
+    def test_staff_can_create_truck(self):
+        staff_user = get_user_model().objects.create_user(
+            username="admin_person", password="test-password-123", is_staff=True
+        )
+        self.client.force_login(staff_user)
+        response = self.client.post("/api/trucks/", NEW_TRUCK_FEATURE, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(FoodTruck.objects.get(name="Brand New Truck").owner, staff_user)
 
 
 class OwnerCheckInTests(APITestCase):
@@ -178,6 +204,23 @@ class OwnerCheckInTests(APITestCase):
         response = self.client.post(self.check_in_url, self.check_in_payload(hours_from_now=30), format="json")
         self.assertEqual(response.status_code, 400)
 
+    def test_customer_can_review_someone_elses_truck(self):
+        # Regression: the owner-or-staff check used to block every customer review
+        self.client.force_login(self.other_user)
+        response = self.client.post(
+            f"/api/trucks/{self.food_truck.id}/reviews/", {"rating": 4, "comment": "Tasty"}, format="json"
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_owner_cannot_review_own_truck(self):
+        self.client.force_login(self.truck_owner)
+        response = self.client.post(f"/api/trucks/{self.food_truck.id}/reviews/", {"rating": 5}, format="json")
+        self.assertEqual(response.status_code, 400)
+
+    def test_anonymous_user_cannot_review(self):
+        response = self.client.post(f"/api/trucks/{self.food_truck.id}/reviews/", {"rating": 5}, format="json")
+        self.assertEqual(response.status_code, 403)
+
     def test_mine_lists_only_owned_trucks(self):
         FoodTruck.objects.create(name="Not Theirs", location=Point(-117.18, 34.05, srid=4326), owner=self.other_user)
         self.client.force_login(self.truck_owner)
@@ -226,6 +269,124 @@ class LoginTests(APITestCase):
 
     def test_me_is_forbidden_when_logged_out(self):
         self.assertEqual(self.browser_client.get("/api/auth/me/").status_code, 403)
+
+
+class RegistrationTests(APITestCase):
+    """Customer sign-up as the browser does it, with real CSRF checking turned on."""
+
+    def setUp(self):
+        # Throttle counts live in the cache; start every test with a clean slate
+        cache.clear()
+        get_user_model().objects.create_user(
+            username="taco_owner", email="owner@example.com", password="test-password-123"
+        )
+        self.browser_client = APIClient(enforce_csrf_checks=True)
+
+    def get_csrf_token(self):
+        self.browser_client.get("/api/auth/csrf/")
+        return self.browser_client.cookies["csrftoken"].value
+
+    def register(self, with_csrf_token=True, **field_overrides):
+        """POST a valid sign-up form, with any fields replaced by field_overrides."""
+        form_fields = {
+            "username": "hungry_customer",
+            "email": "customer@example.com",
+            "password": "grilled-cheese-42",
+            "password_confirmation": "grilled-cheese-42",
+        }
+        form_fields.update(field_overrides)
+        csrf_header = {"HTTP_X_CSRFTOKEN": self.get_csrf_token()} if with_csrf_token else {}
+        return self.browser_client.post("/api/auth/register/", form_fields, format="json", **csrf_header)
+
+    def test_register_creates_customer_account(self):
+        response = self.register()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data, {"username": "hungry_customer", "is_staff": False})
+        new_user = get_user_model().objects.get(username="hungry_customer")
+        self.assertEqual(new_user.email, "customer@example.com")
+        self.assertFalse(new_user.is_staff)
+        self.assertTrue(new_user.check_password("grilled-cheese-42"))  # stored hashed, not plain text
+
+    def test_user_is_logged_in_after_register(self):
+        self.register()
+        response = self.browser_client.get("/api/auth/me/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["username"], "hungry_customer")
+
+    def test_new_customer_can_leave_review(self):
+        # End to end: sign up, then post a review using the same session
+        food_truck = FoodTruck.objects.create(name="Review Me", location=Point(-117.18, 34.05, srid=4326))
+        self.register()
+        response = self.browser_client.post(
+            f"/api/trucks/{food_truck.id}/reviews/",
+            {"rating": 5, "comment": "Great tacos"},
+            format="json",
+            HTTP_X_CSRFTOKEN=self.browser_client.cookies["csrftoken"].value,
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_duplicate_username_is_rejected(self):
+        response = self.register(username="taco_owner")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("username", response.data)
+
+    def test_duplicate_username_with_different_capitals_is_rejected(self):
+        response = self.register(username="Taco_Owner")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("username", response.data)
+
+    def test_duplicate_email_is_rejected(self):
+        response = self.register(email="OWNER@example.com")  # case doesn't matter
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("email", response.data)
+
+    def test_missing_email_is_rejected(self):
+        response = self.register(email="")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("email", response.data)
+
+    def test_weak_password_is_rejected(self):
+        # Fails Django's common-password, numeric and minimum-length validators
+        response = self.register(password="12345", password_confirmation="12345")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("password", response.data)
+        self.assertFalse(get_user_model().objects.filter(username="hungry_customer").exists())
+
+    def test_password_too_similar_to_username_is_rejected(self):
+        response = self.register(password="hungry_customer1", password_confirmation="hungry_customer1")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("password", response.data)
+
+    def test_mismatched_passwords_are_rejected(self):
+        response = self.register(password_confirmation="something-else-42")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("password_confirmation", response.data)
+
+    def test_register_without_csrf_token_is_rejected(self):
+        self.get_csrf_token()  # the cookie exists, but the header is missing
+        response = self.register(with_csrf_token=False)
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(get_user_model().objects.filter(username="hungry_customer").exists())
+
+    def test_register_cannot_create_staff_account(self):
+        response = self.register(is_staff=True, is_superuser=True)  # extra fields are ignored
+        self.assertEqual(response.status_code, 201)
+        new_user = get_user_model().objects.get(username="hungry_customer")
+        self.assertFalse(new_user.is_staff)
+        self.assertFalse(new_user.is_superuser)
+
+    def test_too_many_attempts_are_throttled(self):
+        # Read the limit from settings so this test follows any change to the rate
+        allowed_attempts = int(settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["register"].split("/")[0])
+        for attempt_number in range(allowed_attempts):
+            response = self.register(username=f"customer_{attempt_number}", email=f"customer{attempt_number}@example.com")
+            self.assertEqual(response.status_code, 201)
+            self.browser_client.post(
+                "/api/auth/logout/", HTTP_X_CSRFTOKEN=self.browser_client.cookies["csrftoken"].value
+            )
+        response = self.register(username="one_too_many", email="one_too_many@example.com")
+        self.assertEqual(response.status_code, 429)
+        self.assertFalse(get_user_model().objects.filter(username="one_too_many").exists())
 
 
 # What Nominatim's jsonv2 format sends back (lat/lon arrive as strings)
