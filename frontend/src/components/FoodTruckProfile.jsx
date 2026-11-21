@@ -28,7 +28,7 @@ export default function FoodTruckProfile({
     setIsExpanded(false);
     onClose();
   }
-  const properties = truck?.properties;
+
   const coordinates = truck?.geometry?.coordinates;
   const hasCoordinates = Array.isArray(coordinates) && coordinates.length === 2;
   const directionsUrl = hasCoordinates
@@ -83,6 +83,7 @@ export default function FoodTruckProfile({
         {properties && (
           <>
             <Box sx={{ textAlign: "center", mb: 3 }}>
+              {/* Owner's cover photo, or the truck icon when there isn't one */}
               {properties.cover_photo_url ? (
                 <Box
                   component="img"
