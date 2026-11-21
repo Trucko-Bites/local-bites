@@ -13,7 +13,6 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 
-import { fetchCurrentUser } from "../api/auth.js";
 import {
   deleteTruckReview,
   fetchTruckReviews,
@@ -21,9 +20,11 @@ import {
   updateTruckReview,
   uploadReviewPhotoToCloudinary,
 } from "../api/reviews.js";
+import { useAuth } from "../hooks/useAuth.js";
 
 export default function FoodTruckReviews({ truckId, onReviewSubmitted }) {
-  const [currentUser, setCurrentUser] = useState(null);
+  // undefined = still checking, null = logged out, object = logged in
+  const { currentUser, openAccountDialog } = useAuth();
   const [reviews, setReviews] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -52,14 +53,9 @@ export default function FoodTruckReviews({ truckId, onReviewSubmitted }) {
     setSuccessMessage(null);
     setEditingReviewId(null);
 
-    Promise.all([
-      fetchTruckReviews(truckId),
-      fetchCurrentUser().catch(() => null),
-    ])
-      .then(([reviewsData, user]) => {
-        if (!isCurrent) return;
-        setReviews(reviewsData);
-        setCurrentUser(user);
+    fetchTruckReviews(truckId)
+      .then((reviewsData) => {
+        if (isCurrent) setReviews(reviewsData);
       })
       .catch((error) => {
         if (isCurrent) setErrorMessage(error.message);
@@ -201,74 +197,102 @@ export default function FoodTruckReviews({ truckId, onReviewSubmitted }) {
         Reviews ({reviews.length})
       </Typography>
 
-      {/* Review submission form */}
-      <Box component="form" onSubmit={handleSubmit} sx={{ mb: 3 }}>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
-          Rate this truck
-        </Typography>
-        <Rating
-          name="truck-rating"
-          value={rating}
-          onChange={(_event, newRating) => setRating(newRating)}
-          sx={{ mb: 1.5 }}
-        />
-
-        <TextField
-          fullWidth
-          multiline
-          minRows={2}
-          size="small"
-          label="Share what you ordered..."
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-          sx={{ mb: 1.5 }}
-        />
-
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-          <Button
-            component="label"
-            variant="outlined"
-            size="small"
-            startIcon={<PhotoCameraIcon />}
-          >
-            {photoFile ? "Change Photo" : "Add Photo"}
-            <input
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(event) =>
-                setPhotoFile(event.target.files?.[0] || null)
-              }
-            />
-          </Button>
-          {photoFile && (
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {photoFile.name}
-            </Typography>
+      {/* Logged out: a button that opens the Log in / Sign up dialog instead of the form */}
+      {!currentUser && (
+        <Box sx={{ mb: 3 }}>
+          {errorMessage && (
+            <Alert severity="error" sx={{ mb: 1.5 }}>
+              {errorMessage}
+            </Alert>
           )}
-        </Stack>
+          {currentUser === null && (
+            <Button
+              variant="outlined"
+              size="small"
+              fullWidth
+              onClick={() => openAccountDialog("login")}
+            >
+              Log in to leave a review
+            </Button>
+          )}
+        </Box>
+      )}
 
-        {errorMessage && (
-          <Alert severity="error" sx={{ mb: 1.5 }}>
-            {errorMessage}
-          </Alert>
-        )}
-        {successMessage && (
-          <Alert severity="success" sx={{ mb: 1.5 }}>
-            {successMessage}
-          </Alert>
-        )}
+      {/* Review submission form (logged-in users only) */}
+      {currentUser && (
+        <Box component="form" onSubmit={handleSubmit} sx={{ mb: 3 }}>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Rate this truck
+          </Typography>
+          <Rating
+            name="truck-rating"
+            value={rating}
+            onChange={(_event, newRating) => setRating(newRating)}
+            sx={{ mb: 1.5 }}
+          />
 
-        <Button
-          type="submit"
-          variant="contained"
-          size="small"
-          disabled={isSubmitting}
-          fullWidth
-        >
-          {isSubmitting ? "Posting..." : "Post Review"}
-        </Button>
-      </Box>
+          <TextField
+            fullWidth
+            multiline
+            minRows={2}
+            size="small"
+            label="Share what you ordered..."
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            sx={{ mb: 1.5 }}
+          />
+
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{ mb: 1.5 }}
+          >
+            <Button
+              component="label"
+              variant="outlined"
+              size="small"
+              startIcon={<PhotoCameraIcon />}
+            >
+              {photoFile ? "Change Photo" : "Add Photo"}
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(event) =>
+                  setPhotoFile(event.target.files?.[0] || null)
+                }
+              />
+            </Button>
+            {photoFile && (
+              <Typography variant="caption" color="text.secondary" noWrap>
+                {photoFile.name}
+              </Typography>
+            )}
+          </Stack>
+
+          {errorMessage && (
+            <Alert severity="error" sx={{ mb: 1.5 }}>
+              {errorMessage}
+            </Alert>
+          )}
+          {successMessage && (
+            <Alert severity="success" sx={{ mb: 1.5 }}>
+              {successMessage}
+            </Alert>
+          )}
+
+          <Button
+            type="submit"
+            variant="contained"
+            size="small"
+            disabled={isSubmitting}
+            fullWidth
+          >
+            {isSubmitting ? "Posting..." : "Post Review"}
+          </Button>
+        </Box>
+      )}
 
       {/* Existing reviews list */}
       {isLoading ? (

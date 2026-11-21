@@ -13,6 +13,7 @@ import LocalShippingIcon from '@mui/icons-material/LocalShipping'
 import StorefrontIcon from '@mui/icons-material/Storefront'
 import { useUserLocation } from './hooks/useUserLocation.js'
 import { fetchNearbyFoodTrucks } from './api/foodTrucks.js'
+import AccountButton from './components/AccountButton.jsx'
 import FoodTruckList from './components/FoodTruckList.jsx'
 import FoodTruckMap from './components/FoodTruckMap.jsx'
 import OwnerPanel from './components/OwnerPanel.jsx'
@@ -111,12 +112,14 @@ export default function App() {
       <AppBar position="static" enableColorOnDark>
         <Toolbar>
           <LocalShippingIcon sx={{ marginRight: 1 }} />
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          {/* noWrap: on phones the title shortens with "..." instead of wrapping */}
+          <Typography variant="h6" noWrap sx={{ flexGrow: 1, minWidth: 0 }}>
             Food Truck Finder
           </Typography>
           <Button color="inherit" startIcon={<StorefrontIcon />} onClick={() => setIsOwnerPanelOpen(true)}>
             Owner
           </Button>
+          <AccountButton />
         </Toolbar>
       </AppBar>
 
