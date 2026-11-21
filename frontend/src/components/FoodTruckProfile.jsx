@@ -23,7 +23,6 @@ export default function FoodTruckProfile({
   onReviewSubmitted,
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const properties = truck?.properties;
 
   function handleClose() {
     setIsExpanded(false);
@@ -51,6 +50,7 @@ export default function FoodTruckProfile({
         },
       }}
     >
+
       <Box sx={{ p: 3 }}>
         <Box
           sx={{
@@ -163,7 +163,7 @@ export default function FoodTruckProfile({
               </Button>
             )}
 
-            <FoodTruckMenu truckId={truck.id} />
+            <FoodTruckMenu cuisine={properties.cuisine} />
 
             <Divider sx={{ my: 3 }} />
 
