@@ -1,4 +1,4 @@
-// Owner login using Django's session cookie (same origin as the API).
+// Login and sign-up using Django's session cookie (same origin as the API).
 import { apiRequest } from './apiRequest.js'
 
 /** Makes sure the csrftoken cookie exists before any POST. */
@@ -19,6 +19,15 @@ export async function fetchCurrentUser() {
 export async function logIn({ username, password }) {
   await ensureCsrfCookie()
   return apiRequest('/api/auth/login/', { method: 'POST', body: { username, password } })
+}
+
+/** Creates a customer account; the server logs it in and returns { username, is_staff }. */
+export async function register({ username, email, password, passwordConfirmation }) {
+  await ensureCsrfCookie()
+  return apiRequest('/api/auth/register/', {
+    method: 'POST',
+    body: { username, email, password, password_confirmation: passwordConfirmation },
+  })
 }
 
 export async function logOut() {
