@@ -15,6 +15,27 @@ export function submitTruckReview(truckId, { rating, comment, photoUrl }) {
   });
 }
 
+export function updateTruckReview(
+  truckId,
+  reviewId,
+  { rating, comment, photoUrl },
+) {
+  const body = { rating, comment };
+  if (photoUrl !== undefined) {
+    body.photo_url = photoUrl;
+  }
+  return apiRequest(`/api/trucks/${truckId}/reviews/${reviewId}/`, {
+    method: "PATCH",
+    body,
+  });
+}
+
+export function deleteTruckReview(truckId, reviewId) {
+  return apiRequest(`/api/trucks/${truckId}/reviews/${reviewId}/`, {
+    method: "DELETE",
+  });
+}
+
 export async function uploadReviewPhotoToCloudinary(file) {
   const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
   const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
