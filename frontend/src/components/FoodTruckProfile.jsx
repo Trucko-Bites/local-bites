@@ -12,11 +12,8 @@ import OpenInFullIcon from "@mui/icons-material/OpenInFull";
 import FoodTruckMenu from "./FoodTruckMenu.jsx";
 import Rating from "@mui/material/Rating";
 import Stack from "@mui/material/Stack";
-import CloseIcon from "@mui/icons-material/Close";
 import Button from "@mui/material/Button";
 import DirectionsIcon from "@mui/icons-material/Directions";
-import LocalShippingIcon from "@mui/icons-material/LocalShipping";
-import FoodTruckMenu from "./FoodTruckMenu.jsx";
 import FoodTruckReviews from "./FoodTruckReviews.jsx";
 
 export default function FoodTruckProfile({
@@ -26,7 +23,6 @@ export default function FoodTruckProfile({
   onReviewSubmitted,
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const properties = truck?.properties;
 
   function handleClose() {
     setIsExpanded(false);
@@ -51,14 +47,10 @@ export default function FoodTruckProfile({
             maxWidth: "100%",
             transition: (theme) => theme.transitions.create("width"),
           },
-      onClose={onClose}
-      PaperProps={{
-        sx: {
-          width: { xs: "100%", sm: 420 },
-          maxWidth: "100%",
         },
       }}
     >
+
       <Box sx={{ p: 3 }}>
         <Box
           sx={{
@@ -91,9 +83,6 @@ export default function FoodTruckProfile({
         {properties && (
           <>
             <Box sx={{ textAlign: "center", mb: 3 }}>
-              <LocalShippingIcon
-                sx={{ fontSize: 64, color: "primary.main" }}
-              />
               {properties.cover_photo_url ? (
                 <Box
                   component="img"
@@ -173,7 +162,7 @@ export default function FoodTruckProfile({
               </Button>
             )}
 
-            <FoodTruckMenu truckId={truck.id} />
+            <FoodTruckMenu cuisine={properties.cuisine} />
 
             <Divider sx={{ my: 3 }} />
 

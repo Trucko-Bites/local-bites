@@ -43,7 +43,7 @@ const menuByCuisine = {
 }
 
 const getCuisineMenu = (cuisine = '') => {
-  const type = cuisine.toLowerCase()
+  const type = (cuisine ?? '').toLowerCase()
 
   if (type.includes('mexican') || type.includes('taco')) return menuByCuisine.mexican
   if (type.includes('thai')) return menuByCuisine.thai
@@ -58,7 +58,7 @@ const getCuisineMenu = (cuisine = '') => {
 
 
 // Changed menu items based on cuisine types
-export default function FoodTruckMenu({ truckId, cuisine, items }) {
+export default function FoodTruckMenu({ cuisine, items }) {
   const menuItems = items ?? getCuisineMenu(cuisine)
 
   const categories = [
